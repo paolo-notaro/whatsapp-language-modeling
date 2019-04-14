@@ -1,22 +1,21 @@
 import re
-import pandas as pd
 import datetime
 from emoji import UNICODE_EMOJI
 from numpy import random
 from string import punctuation
+from random import shuffle
 
 
 def produce_conversations(file_path, word_emoji_tokenization=True):
 
     with open(file_path, 'r', encoding='utf8') as f:
-        strings = re.findall(r'(\d+.\d+.\d+,\s+\d+:\d{2})\s-\s(.*):\s(.*)', f.read())
+        rows = re.findall(r'(\d+.\d+.\d+,\s+\d+:\d{2})\s-\s(.*):\s(.*)', f.read())
+        msg_table = [{key: value for key, value in zip(('DateTime', 'Sender', 'Message'), row)} for row in rows]
 
-    msg_table = pd.DataFrame(strings, columns=['DateTime', 'Sender', 'Message'])
-
-    convs = []
+    conversations = []
     conversation = []
     last_timestamp = datetime.datetime.min
-    for index, row in msg_table.iterrows():
+    for index, row in enumerate(msg_table):
 
         print("Processing message %d/%d\r" % (index + 1, len(msg_table)), end='')
 
@@ -48,18 +47,18 @@ def produce_conversations(file_path, word_emoji_tokenization=True):
         timestamp = datetime.datetime.strptime(row['DateTime'], "%m/%d/%y, %H:%M")
         if timestamp > last_timestamp + datetime.timedelta(minutes=90):
             if len(conversation) > 3:
-                convs.append(conversation)
+                conversations.append(conversation)
             conversation = []
 
         conversation.append(row)
         last_timestamp = timestamp
-
-    print("Loading done.                  ")
-    return convs
+    print("")
+    shuffle(conversations)
+    return conversations
 
 
 if __name__ == '__main__':
 
-    conversations = produce_conversations('/home/paulstpr/Downloads/WhatsApp Chat with Sara Pontelli 💙.txt', True)
-    print([len(conversation) for conversation in conversations])
-    print(conversations[random.choice(len(conversations))])
+    convs = produce_conversations('/home/paulstpr/Downloads/WhatsApp Chat with Sara Pontelli 💙.txt', True)
+    print([len(conversation) for conversation in convs])
+    print(convs[random.choice(len(convs))])

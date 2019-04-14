@@ -1,6 +1,8 @@
 from loader import produce_conversations
 import torch
 
+meta_tokens = {"<BEGIN>", "<CHANGE SENDER>", "<NEW MESSAGE>", "<END>"}
+
 
 class LabelIndexMap(object):
     """
@@ -26,18 +28,11 @@ class LabelIndexMap(object):
 
 class WhatsappConversationDataset:
 
-    def __init__(self, whatsapp_export):
+    def __init__(self, conversations: list, label_map: LabelIndexMap):
 
         super().__init__()
-        self._convs = produce_conversations(whatsapp_export)
-        all_tokens = set(token for conv in self._convs for message in conv for token in message['Tokens'])
-        all_tokens.add("<BEGIN>")
-        all_tokens.add("<CHANGE SENDER>")
-        all_tokens.add("<NEW MESSAGE>")
-        all_tokens.add("<END>")
-        self.num_tokens = len(all_tokens)
-        self.label_map = LabelIndexMap(all_tokens)
-        self.label_map.save("legend.txt")
+        self._convs = conversations
+        self.label_map = label_map
 
     def __getitem__(self, idx):
         conversation = self._convs[idx]
@@ -59,3 +54,15 @@ class WhatsappConversationDataset:
 
     def __len__(self):
         return len(self._convs)
+
+
+def produce_datasets(whatsapp_export_filepath, val_ratio=0.2):
+    conversations = produce_conversations(whatsapp_export_filepath)
+    tokens = set(token for conv in conversations for message in conv for token in message['Tokens']).union(meta_tokens)
+    label_map = LabelIndexMap(tokens)
+    label_map.save("legend.txt")
+
+    train_ds_size = int((1 - val_ratio) * len(conversations))
+    train_conversations, val_conversations = conversations[:train_ds_size], conversations[train_ds_size:]
+    return WhatsappConversationDataset(train_conversations, label_map), \
+           WhatsappConversationDataset(val_conversations, label_map)
