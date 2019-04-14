@@ -14,6 +14,7 @@ def produce_conversations(file_path, word_emoji_tokenization=True):
 
     conversations = []
     conversation = []
+    skip_count = 0
     last_timestamp = datetime.datetime.min
     for index, row in enumerate(msg_table):
 
@@ -48,6 +49,8 @@ def produce_conversations(file_path, word_emoji_tokenization=True):
         if timestamp > last_timestamp + datetime.timedelta(minutes=90):
             if len(conversation) > 3:
                 conversations.append(conversation)
+            else:
+                skip_count += 1
             conversation = []
 
         conversation.append(row)
