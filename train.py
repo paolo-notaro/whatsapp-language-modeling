@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import DataLoader
 from torch.nn import NLLLoss
 from torch.optim import Adam
-from math import inf
+from math import inf, exp
 from dataset import produce_datasets
 from models import LanguageModelingRNN
 
@@ -58,28 +58,31 @@ if __name__ == '__main__':
             optimizer.step()
 
             if (j + 1) % log_every == 0:
-                print("\rEpoch %3d/%3d, loss: %2.6f, batch: %3d/%3d" % (epoch + 1, num_epochs,
-                                                                        batch_loss, j + 1, len(train_loader)),
-                      end='')
+                print("\rEpoch %3d/%3d, loss: %2.6f, batch: %3d/%3d" % (epoch + 1, num_epochs, batch_loss, j + 1,
+                                                                        len(train_loader)), end='')
 
         # evaluation
         print("\nEvaluating...\r", end='')
         model.eval()
         val_loss = 0
-        for j, (tokens, target) in enumerate(val_loader):
+        for j, (tokens, targets) in enumerate(val_loader):
 
             # move to GPU
             tokens = tokens.to(device)
-            targets = target.to(device)
+            targets = targets.to(device)
 
             # forward
             output = model(tokens).permute(0, 2, 1)
             loss = criterion(output, targets)
             val_loss += loss.item()
 
+            # compute perplexity
+            print(loss.item(), exp(loss.item()))
+
         val_loss /= len(val_loader)
-        print("Evaluation completed. Validation loss: {:2.6f}".format(val_loss))
+        print("Evaluation completed. Validation loss: {:2.6f}, average perplexity: {:2.6f}".format(val_loss,
+                                                                                                   exp(val_loss)))
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            torch.save(model, "val_{}.pt".format(val_loss))
+            torch.save(model, "val_{:.4f}.pt".format(val_loss))
