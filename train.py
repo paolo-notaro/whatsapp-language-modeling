@@ -1,8 +1,9 @@
 import torch
 from torch.utils.data import DataLoader
-from torch.nn import Embedding, LSTM, Linear, Module, NLLLoss, functional as func
+from torch.nn import NLLLoss
 from torch.optim import Adam
 from conversation_dataset import WhatsappConversationDataset
+from models import LanguageModelingRNN
 
 num_epochs = 1000
 lr = 1e-3
@@ -12,36 +13,6 @@ save_every = 1
 criterion = NLLLoss(reduction='mean')
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 dataset_file_path = '/home/paulstpr/Downloads/WhatsApp Chat with Sara Pontelli 💙.txt'
-
-
-class LanguageModelingRNN(Module):
-
-    def __init__(self, lexicon_size, embedding_dim, lstm_layers, hidden_size, fc_hidden_size, dev):
-        super().__init__()
-
-        self.hidden_state = None
-        self.hidden_size = hidden_size
-        self.device = dev
-        self.lstm_layers = lstm_layers
-        self.reset_state()
-
-        self.embedding = Embedding(lexicon_size, embedding_dim)
-        self.lstm = LSTM(input_size=embedding_dim, hidden_size=hidden_size, num_layers=lstm_layers, batch_first=True)
-        self.fc1 = Linear(hidden_size, fc_hidden_size)
-        self.fc2 = Linear(fc_hidden_size, lexicon_size)
-
-    def forward(self, x, reset_state=True):
-
-        if reset_state:
-            self.reset_state()
-
-        x = self.embedding(x)
-        z, self.hidden_state = self.lstm(x, self.hidden_state)
-        x = func.relu(self.fc1(z))
-        return func.log_softmax(self.fc2(x), dim=2)
-
-    def reset_state(self):
-        self.hidden_state = [torch.zeros((self.lstm_layers, 1, self.hidden_size)).to(self.device) for _ in range(2)]
 
 
 if __name__ == '__main__':
