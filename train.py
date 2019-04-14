@@ -4,6 +4,15 @@ from torch.nn import Embedding, LSTM, Linear, Module, NLLLoss, functional as fun
 from torch.optim import Adam
 from conversation_dataset import WhatsappConversationDataset
 
+num_epochs = 1000
+lr = 1e-3
+bs = 32
+log_every = 1
+save_every = 1
+criterion = NLLLoss(reduction='mean')
+device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+dataset_file_path = '/home/paulstpr/Downloads/WhatsApp Chat with Sara Pontelli 💙.txt'
+
 
 class LanguageModelingRNN(Module):
 
@@ -37,16 +46,8 @@ class LanguageModelingRNN(Module):
 
 if __name__ == '__main__':
 
-    num_epochs = 1000
-    lr = 1e-3
-    bs = 32
-    log_every = 1
-    save_every = 1
-    criterion = NLLLoss(reduction='mean')
-    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-
     print("Loading dataset...")
-    ds = WhatsappConversationDataset('/home/paulstpr/Downloads/WhatsApp Chat with Sara Pontelli 💙.txt')
+    ds = WhatsappConversationDataset(dataset_file_path)
     train_loader = DataLoader(ds, shuffle=True, batch_size=bs, collate_fn=lambda x: x)
 
     print("Loading model...")
