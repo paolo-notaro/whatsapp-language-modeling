@@ -76,9 +76,6 @@ if __name__ == '__main__':
             loss = criterion(output, targets)
             val_loss += loss.item()
 
-            # compute perplexity
-            print(loss.item(), exp(loss.item()))
-
         val_loss /= len(val_loader)
         print("Evaluation completed. Validation loss: {:2.6f}, average perplexity: {:2.6f}".format(val_loss,
                                                                                                    exp(val_loss)))
