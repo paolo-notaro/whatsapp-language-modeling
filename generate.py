@@ -6,6 +6,8 @@ from string import punctuation
 yes = ['y', 'yes']
 no = ['n', 'no']
 
+model_name = "val_4.6371.pt"
+
 
 def post_process(conv):
     res = "0:"
@@ -37,7 +39,7 @@ def post_process(conv):
 if __name__ == '__main__':
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    model = torch.load("model.pt")
+    model = torch.load(model_name)
     model.to(device)
     model.eval()
 

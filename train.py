@@ -23,8 +23,8 @@ if __name__ == '__main__':
     val_loader = DataLoader(ds_val, shuffle=False, batch_size=1, collate_fn=lambda x: x[0])
 
     print("Loading model...", end='')
-    model = LanguageModelingRNN(lexicon_size=len(ds_train.label_map), embedding_dim=128,
-                                lstm_layers=2, hidden_size=512, fc_hidden_size=2560, dev=device)
+    model = LanguageModelingRNN(lexicon_size=len(ds_train.label_map), embedding_dim=64,
+                                lstm_layers=1, hidden_size=256, fc_hidden_size=2048, p_dropout=0.5, dev=device)
     model.to(device)
     optimizer = Adam(model.parameters(), lr=lr)
     print('done.')
