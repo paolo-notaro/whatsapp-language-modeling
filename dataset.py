@@ -30,8 +30,8 @@ class LabelIndexMap(object):
                 self.individual_labels[current_position] = self.individual_labels[required_position]
                 self.individual_labels[required_position] = element
 
-        self.label_to_index = {label: self.individual_labels.index(label) for label in self.individual_labels}
-        self.index_to_label = {self.individual_labels.index(label): label for label in self.individual_labels}
+        self.label_to_index = {label: i for i, label in enumerate(self.individual_labels)}
+        self.index_to_label = {i: label for i, label in enumerate(self.individual_labels)}
 
     def __getitem__(self, item):
         return self.label_to_index[item]
