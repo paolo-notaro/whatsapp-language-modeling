@@ -3,76 +3,117 @@ from torch.utils.data import DataLoader
 from torch.nn import NLLLoss
 from torch.optim import Adam
 from math import inf, exp
+import numpy as np
+import time
 from dataset import produce_datasets
 from models import LanguageModelingRNN
 
 num_epochs = 100
 lr = 1e-3
-bs = 32
+bs = 3
 log_every = 1
 val_ratio = 0.1
-criterion = NLLLoss(reduction='mean')
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 dataset_file_path = '/home/paulstpr/Downloads/WhatsApp Chat with Sara Pontelli 💙.txt'
+
+
+class CollatePad(object):
+
+    def __init__(self, pad_value=0):
+        self.pad_value = pad_value
+
+    def __call__(self, batch):
+        """
+        Collates groups of Tensors of different lengths into one Tensor (for each group).
+        :param batch: list of tuple of tensors (e.g. list of 32 tuples, where the first elements are inputs and the
+        seconds are targets). Individual Tensors must be of shape (T, N1, N2, N3, ...) where T is the variable dimension
+        and N1, N2, N3, ... are any number of additional dimensions of fixed size. Inside the final Tensor, elements
+        will be sorted in descending order of length. IMPORTANT: it is assumed that the order according to length is
+        consistent across groups, i.e. the variable lengths inside the different groups of Tensor are equal along the
+        same index in the group. Example: group 1 represents tokenized sentences [["Hi", "Paolo", speaking"],
+        ["Hi", "how", "are", "you", "today"]], group 2 POS tags [[EXCL, NOM, VRB], [EXCL, ADV, BE, SUBJ, ADV]],
+        lengths are consistent across groups thus the program can sort according to the length of item of any attribute.
+        :return: tuple of:
+            * list of Tensors containing the padded batch, one for each group;
+            * list of Tensors containing the variable lengths, one for each group.
+        """
+
+        batch = sorted(batch, reverse=True, key=lambda elem: len(elem[0]))
+        variable_lengths = np.array([[tensor.shape[0] for tensor in tensors] for tensors in batch])
+        batch_size, num_tensors = variable_lengths.shape
+        max_lengths = np.max(variable_lengths, axis=0)
+
+        padded_batch = []
+        lengths = []
+        for group_index, max_length in enumerate(max_lengths):
+            tensors = [tensors[group_index] for tensors in batch]
+            single_tensor_shape = (max_length, *batch[0][group_index].shape[1:])
+            padded_tensor = self.pad_value * torch.ones((batch_size, *single_tensor_shape), dtype=torch.long)
+            for batch_index, length in enumerate(variable_lengths[:, group_index]):
+                padded_tensor[batch_index, :length] = tensors[batch_index]
+            padded_batch.append(padded_tensor)
+            lengths.append(torch.tensor(variable_lengths[:, group_index], dtype=torch.int))
+        return padded_batch, lengths
 
 
 if __name__ == '__main__':
 
     ds_train, ds_val = produce_datasets(dataset_file_path)
-    train_loader = DataLoader(ds_train, shuffle=True, batch_size=bs, collate_fn=lambda x: x)
-    val_loader = DataLoader(ds_val, shuffle=False, batch_size=1, collate_fn=lambda x: x[0])
+    padding_idx = ds_train.label_map.label_to_index['<PAD>']
+    collate_fn = CollatePad(padding_idx)
+    train_loader = DataLoader(ds_train, shuffle=True, batch_size=bs, collate_fn=collate_fn)
+    val_loader = DataLoader(ds_val, shuffle=False, batch_size=bs, collate_fn=collate_fn)
 
     print("Loading model...", end='')
-    model = LanguageModelingRNN(lexicon_size=len(ds_train.label_map), embedding_dim=64,
-                                lstm_layers=1, hidden_size=256, fc_hidden_size=2048, p_dropout=0.5, dev=device)
+    model = LanguageModelingRNN(lexicon_size=len(ds_train.label_map), embedding_dim=64, padding_idx=padding_idx,
+                                lstm_layers=1, hidden_size=128, p_dropout=0.5, dev=device)
     model.to(device)
     optimizer = Adam(model.parameters(), lr=lr)
+    criterion = NLLLoss(reduction='mean', ignore_index=padding_idx)
     print('done.')
 
     print("Starting training...")
     best_val_loss = inf
+    t_start = time.time()
     for epoch in range(num_epochs):
 
         model.train()
-        for j, batch in enumerate(train_loader):
+        for j, ((tokens, targets), (input_lengths, _)) in enumerate(train_loader):
 
             optimizer.zero_grad()
-            batch_loss = 0
-            for tokens, targets in batch:
-
-                # move to GPU
-                tokens = tokens.to(device)
-                targets = targets.to(device)
-
-                # forward
-                output = model(tokens).permute(0, 2, 1)
-                loss = criterion(output, targets)
-                batch_loss += loss.item()
-
-                # backward
-                loss.backward()
-
-            batch_loss /= len(batch)
-
-            # update step
-            optimizer.step()
-
-            if (j + 1) % log_every == 0:
-                print("\rEpoch %3d/%3d, loss: %2.6f, batch: %3d/%3d" % (epoch + 1, num_epochs, batch_loss, j + 1,
-                                                                        len(train_loader)), end='')
-
-        # evaluation
-        print("\nEvaluating...\r", end='')
-        model.eval()
-        val_loss = 0
-        for j, (tokens, targets) in enumerate(val_loader):
 
             # move to GPU
             tokens = tokens.to(device)
             targets = targets.to(device)
 
             # forward
-            output = model(tokens).permute(0, 2, 1)
+            output = model(tokens, input_lengths)
+            loss = criterion(output, targets)
+
+            # backward
+            loss.backward()
+
+            # update step
+            optimizer.step()
+
+            if (j + 1) % log_every == 0:
+                print("\rEpoch %3d/%3d, loss: %2.6f, "
+                      "batch: %3d/%3d, pad length: %4d" % (epoch + 1, num_epochs, loss.item(), j + 1,
+                                                           len(train_loader), max(input_lengths)), end='')
+
+        # evaluation
+        epoch_duration = time.time() - t_start
+        print("\nEpoch completed in {:3.2f}s. Evaluating...\r".format(epoch_duration), end='')
+        model.eval()
+        val_loss = 0
+        for j, ((tokens, targets), (input_lengths, _)) in enumerate(val_loader):
+
+            # move to GPU
+            tokens = tokens.to(device)
+            targets = targets.to(device)
+
+            # forward
+            output = model(tokens, input_lengths)
             loss = criterion(output, targets)
             val_loss += loss.item()
 

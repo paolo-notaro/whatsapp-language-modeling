@@ -67,9 +67,10 @@ class WhatsappConversationDataset:
             previous_message_sender = message['Sender']
         target_tokens = conversation_tokens[1:] + ["<END>"]
 
+        # transform to Tensor
         conversation_tokens = torch.tensor([self.label_map[token] for token in conversation_tokens])
         target_tokens = torch.tensor([self.label_map[token] for token in target_tokens])
-        return conversation_tokens.unsqueeze(0), target_tokens.unsqueeze(0)
+        return conversation_tokens, target_tokens
 
     def __len__(self):
         return len(self._convs)

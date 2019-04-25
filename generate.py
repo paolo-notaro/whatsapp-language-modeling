@@ -6,7 +6,7 @@ from string import punctuation
 yes = ['y', 'yes']
 no = ['n', 'no']
 
-model_name = "val_4.6371.pt"
+model_name = "val_4.5134.pt"
 
 
 def post_process(conv):
@@ -66,7 +66,7 @@ if __name__ == '__main__':
             while curr_token != '<END>':
 
                 curr_token_tensor = torch.tensor(legend[curr_token]).to(device).unsqueeze(0).unsqueeze(0)
-                output_probabilities = model(curr_token_tensor, reset_state=False).squeeze().cpu().detach().numpy()
+                output_probabilities = model(curr_token_tensor, [1], reset_state=False).squeeze().cpu().detach().numpy()
 
                 next_token_index = np.random.choice(len(legend), p=np.exp(output_probabilities))
                 next_token = legend_reversed[next_token_index]
