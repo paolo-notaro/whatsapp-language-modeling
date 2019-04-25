@@ -3,6 +3,18 @@ from torch.nn import Embedding, LSTM, Linear, Module, Sequential, Dropout, funct
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 
+def kaiming_init(m):
+    if isinstance(m, Linear):
+        torch.nn.init.kaiming_normal_(m.weight)
+        torch.nn.init.constant_(m.bias, 0)
+    elif isinstance(m, LSTM):
+        for name, param in m._parameters.items():
+            if "weight" in name:
+                torch.nn.init.kaiming_normal_(param)
+            elif "bias" in name:
+                torch.nn.init.constant_(param, 0)
+
+
 class LanguageModelingRNN(Module):
 
     def __init__(self, lexicon_size, embedding_dim, padding_idx, lstm_layers, hidden_size, p_dropout, dev):
@@ -12,12 +24,13 @@ class LanguageModelingRNN(Module):
         self.hidden_size = hidden_size
         self.device = dev
         self.lstm_layers = lstm_layers
-        self.reset_state()
 
         self.embedding = Embedding(num_embeddings=lexicon_size, embedding_dim=embedding_dim, padding_idx=padding_idx)
         self.lstm = LSTM(input_size=embedding_dim, hidden_size=hidden_size, num_layers=lstm_layers, batch_first=True)
-        self.fc = Sequential(Dropout(p=p_dropout, inplace=True),
-                             Linear(hidden_size, lexicon_size))
+        self.fc = Sequential(Dropout(p=p_dropout, inplace=True), Linear(hidden_size, lexicon_size))
+
+        self.reset_state()
+        self.apply(kaiming_init)
 
     def forward(self, x, x_lengths, reset_state=True):
 
