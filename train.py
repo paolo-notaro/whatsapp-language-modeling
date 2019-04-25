@@ -74,10 +74,10 @@ if __name__ == '__main__':
 
     print("Starting training...")
     best_val_loss = inf
-    t_start = time.time()
     for epoch in range(num_epochs):
 
         model.train()
+        t_start = time.time()
         for j, ((tokens, targets), (input_lengths, _)) in enumerate(train_loader):
 
             optimizer.zero_grad()
