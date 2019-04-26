@@ -7,10 +7,11 @@ import numpy as np
 import time
 from dataset import produce_datasets
 from models import LanguageModelingRNN
+from tensorboardX import SummaryWriter
 
 num_epochs = 100
-lr = 1e-3
-bs = 3
+lr = 5e-4
+bs = 1
 log_every = 1
 val_ratio = 0.1
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -65,14 +66,15 @@ if __name__ == '__main__':
     val_loader = DataLoader(ds_val, shuffle=False, batch_size=bs, collate_fn=collate_fn)
 
     print("Loading model...", end='')
-    model = LanguageModelingRNN(lexicon_size=len(ds_train.label_map), embedding_dim=64, padding_idx=padding_idx,
-                                lstm_layers=1, hidden_size=128, p_dropout=0.5, dev=device)
+    model = LanguageModelingRNN(lexicon_size=len(ds_train.label_map), embedding_dim=32, padding_idx=padding_idx,
+                                lstm_layers=1, hidden_size=512, p_dropout=0.5, dev=device)
     model.to(device)
     optimizer = Adam(model.parameters(), lr=lr)
     criterion = NLLLoss(reduction='mean', ignore_index=padding_idx)
     print('done.')
 
     print("Starting training...")
+    writer = SummaryWriter()
     best_val_loss = inf
     for epoch in range(num_epochs):
 
@@ -89,6 +91,7 @@ if __name__ == '__main__':
             # forward
             output = model(tokens, input_lengths)
             loss = criterion(output, targets)
+            loss_value = loss.item()
 
             # backward
             loss.backward()
@@ -97,8 +100,9 @@ if __name__ == '__main__':
             optimizer.step()
 
             if (j + 1) % log_every == 0:
+                writer.add_scalar("Loss/train", loss_value, global_step=epoch*len(train_loader) + j)
                 print("\rEpoch %3d/%3d, loss: %2.6f, "
-                      "batch: %3d/%3d, pad length: %4d" % (epoch + 1, num_epochs, loss.item(), j + 1,
+                      "batch: %3d/%3d, pad length: %4d" % (epoch + 1, num_epochs, loss_value, j + 1,
                                                            len(train_loader), max(input_lengths)), end='')
 
         # evaluation
@@ -118,9 +122,12 @@ if __name__ == '__main__':
             val_loss += loss.item()
 
         val_loss /= len(val_loader)
+        writer.add_scalar("Loss/val", val_loss, global_step=(epoch + 1) * len(train_loader))
+        writer.add_embedding(mat=model.embedding.weight.data, metadata=ds_train.label_map.label_to_index.keys(),
+                             global_step=(epoch + 1) * len(train_loader))
         print("Evaluation completed. Validation loss: {:2.6f}, average perplexity: {:2.6f}".format(val_loss,
                                                                                                    exp(val_loss)))
-
+        # save
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             torch.save(model, "val_{:.4f}.pt".format(val_loss))
