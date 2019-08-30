@@ -10,8 +10,9 @@ from models import LanguageModelingRNN
 from tensorboardX import SummaryWriter
 
 num_epochs = 100
-lr = 5e-4
-bs = 1
+lr = 3e-4
+bs = 3
+l2_reg = 0
 log_every = 1
 val_ratio = 0.1
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -66,12 +67,12 @@ if __name__ == '__main__':
     val_loader = DataLoader(ds_val, shuffle=False, batch_size=bs, collate_fn=collate_fn)
 
     print("Loading model...", end='')
-    model = LanguageModelingRNN(lexicon_size=len(ds_train.label_map), embedding_dim=32, padding_idx=padding_idx,
-                                lstm_layers=1, hidden_size=512, p_dropout=0.5, dev=device)
+    model = LanguageModelingRNN(lexicon_size=len(ds_train.label_map), embedding_dim=64, padding_idx=padding_idx,
+                                lstm_layers=2, hidden_size=128, p_dropout=0.5, dev=device)
     model.to(device)
-    optimizer = Adam(model.parameters(), lr=lr)
+    optimizer = Adam(model.parameters(), lr=lr, weight_decay=l2_reg)
     criterion = NLLLoss(reduction='mean', ignore_index=padding_idx)
-    print('done.')
+    print('done. (parameter count: {})'.format(sum(p.numel() for p in model.parameters())))
 
     print("Starting training...")
     writer = SummaryWriter()
