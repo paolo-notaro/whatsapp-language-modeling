@@ -15,7 +15,7 @@ bs = 1
 log_every = 1
 val_ratio = 0.1
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-dataset_file_path = '/home/paulstpr/Downloads/WhatsApp Chat with Sara Pontelli 💙.txt'
+dataset_file_path = ''  # insert conversation dataset file here
 
 
 class CollatePad(object):
