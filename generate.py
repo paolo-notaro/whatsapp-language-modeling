@@ -1,12 +1,12 @@
 import torch
 import numpy as np
-from train import LanguageModelingRNN
 from string import punctuation
 
 yes = ['y', 'yes']
 no = ['n', 'no']
 
-model_name = "val_4.5134.pt"
+model_name = "val_4.1867.pt"
+legend_file = "legend_5000.txt"
 
 
 def post_process(conv):
@@ -43,7 +43,7 @@ if __name__ == '__main__':
     model.to(device)
     model.eval()
 
-    legend_file_content = np.loadtxt("legend.txt", dtype=str, delimiter="\t", comments=None)
+    legend_file_content = np.loadtxt(legend_file, dtype=str, delimiter="\t", comments=None)
     legend = {entry[0]: int(entry[1]) for entry in legend_file_content}
     legend_reversed = {int(entry[1]): entry[0] for entry in legend_file_content}
 

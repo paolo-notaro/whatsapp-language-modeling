@@ -1,7 +1,20 @@
 from loader import produce_conversations
 import torch
 
-meta_tokens = {"<PAD>", "<BEGIN>", "<CHANGE SENDER>", "<NEW MESSAGE>", "<END>"}
+meta_tokens = {"<UNK>", "<PAD>", "<BEGIN>", "<CHANGE SENDER>", "<NEW MESSAGE>", "<END>"}
+PAD_INDEX = 0
+UNK_INDEX = 1
+
+
+def compute_lexicon(convs, max_size):
+    token_occ = dict()
+    for conv in convs:
+        for message in conv:
+            for token in message["Tokens"]:
+                token_occ[token] = token_occ.get(token, 0) + 1
+    token_occ = sorted(token_occ.items(), key=lambda x: (x[1], x[0]), reverse=True)
+    top_k_tokens = list(map(lambda x: x[0], token_occ))[:max_size]
+    return top_k_tokens
 
 
 class LabelIndexMap(object):
@@ -55,7 +68,7 @@ class WhatsappConversationDataset:
 
     def __getitem__(self, idx):
         conversation = self._convs[idx]
-        conversation_tokens = ["<BEGIN>"]
+        conv_tokens = ["<BEGIN>"]
         previous_message_sender = conversation[0]['Sender']
         for message in conversation:
             message_tokens = []
@@ -63,23 +76,31 @@ class WhatsappConversationDataset:
                 message_tokens += ["<CHANGE SENDER>"]
             message_tokens += [token for token in message['Tokens']]
             message_tokens += ["<NEW MESSAGE>"]
-            conversation_tokens.extend(message_tokens)
+            conv_tokens.extend(message_tokens)
             previous_message_sender = message['Sender']
-        target_tokens = conversation_tokens[1:] + ["<END>"]
+        target_tokens = conv_tokens[1:] + ["<END>"]
 
         # transform to Tensor
-        conversation_tokens = torch.tensor([self.label_map[token] for token in conversation_tokens])
-        target_tokens = torch.tensor([self.label_map[token] for token in target_tokens])
-        return conversation_tokens, target_tokens
+        conv_tokens = torch.tensor([self.label_map.label_to_index.get(token, UNK_INDEX) for token in conv_tokens])
+        target_tokens = torch.tensor([self.label_map.label_to_index.get(token, UNK_INDEX) for token in target_tokens])
+        return conv_tokens, target_tokens
 
     def __len__(self):
         return len(self._convs)
 
 
-def produce_datasets(whatsapp_export_filepath, val_ratio=0.2):
+def produce_datasets(whatsapp_export_filepath, max_lexicon_size=None, val_ratio=0.2):
+
     conversations = produce_conversations(whatsapp_export_filepath)
-    tokens = set(token for conv in conversations for message in conv for token in message['Tokens']) | meta_tokens
-    label_map = LabelIndexMap(tokens, required_mappings={"<PAD>": 0})
+
+    if max_lexicon_size is None:
+        tokens = set(token for conv in conversations for message in conv for token in message['Tokens'])
+    else:
+        token_lexicon = compute_lexicon(conversations, max_lexicon_size)
+        tokens = set(token_lexicon)
+    tokens |= meta_tokens
+
+    label_map = LabelIndexMap(tokens, required_mappings={"<PAD>": PAD_INDEX, "<UNK>": UNK_INDEX})
     label_map.save("legend.txt")
 
     train_ds_size = int((1 - val_ratio) * len(conversations))

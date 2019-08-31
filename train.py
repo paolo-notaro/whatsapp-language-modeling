@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import DataLoader
 from torch.nn import NLLLoss
-from torch.optim import Adam
+from torch.optim import Adam, lr_scheduler
 from math import inf, exp
 import numpy as np
 import time
@@ -9,9 +9,12 @@ from dataset import produce_datasets
 from models import LanguageModelingRNN
 from tensorboardX import SummaryWriter
 
-num_epochs = 100
-lr = 3e-4
-bs = 3
+
+num_epochs = 1000
+init_lr = 1e-3
+gamma = 0.5
+decay_every = 10
+bs = 5
 l2_reg = 0
 log_every = 1
 val_ratio = 0.1
@@ -60,17 +63,20 @@ class CollatePad(object):
 
 if __name__ == '__main__':
 
-    ds_train, ds_val = produce_datasets(dataset_file_path)
+    print("Loading data...")
+    ds_train, ds_val = produce_datasets(dataset_file_path, max_lexicon_size=lexicon_size)
     padding_idx = ds_train.label_map.label_to_index['<PAD>']
     collate_fn = CollatePad(padding_idx)
     train_loader = DataLoader(ds_train, shuffle=True, batch_size=bs, collate_fn=collate_fn)
     val_loader = DataLoader(ds_val, shuffle=False, batch_size=bs, collate_fn=collate_fn)
+    print("done. (train set size = {}, lexicon size = {})".format(len(ds_train), len(ds_train.label_map)))
 
     print("Loading model...", end='')
     model = LanguageModelingRNN(lexicon_size=len(ds_train.label_map), embedding_dim=64, padding_idx=padding_idx,
-                                lstm_layers=2, hidden_size=128, p_dropout=0.5, dev=device)
+                                lstm_layers=2, hidden_size=512, p_dropout=0.5, dev=device)
     model.to(device)
-    optimizer = Adam(model.parameters(), lr=lr, weight_decay=l2_reg)
+    optimizer = Adam(model.parameters(), lr=init_lr, weight_decay=l2_reg)
+    scheduler = lr_scheduler.StepLR(optimizer=optimizer, step_size=decay_every, gamma=gamma)
     criterion = NLLLoss(reduction='mean', ignore_index=padding_idx)
     print('done. (parameter count: {})'.format(sum(p.numel() for p in model.parameters())))
 
@@ -103,8 +109,9 @@ if __name__ == '__main__':
             if (j + 1) % log_every == 0:
                 writer.add_scalar("Loss/train", loss_value, global_step=epoch*len(train_loader) + j)
                 print("\rEpoch %3d/%3d, loss: %2.6f, "
-                      "batch: %3d/%3d, pad length: %4d" % (epoch + 1, num_epochs, loss_value, j + 1,
-                                                           len(train_loader), max(input_lengths)), end='')
+                      "batch: %3d/%3d, pad length: %4d, lr: %.6f" % (epoch + 1, num_epochs, loss_value, j + 1,
+                                                                     len(train_loader), max(input_lengths),
+                                                                     scheduler.get_lr()[0]), end='')
 
         # evaluation
         epoch_duration = time.time() - t_start
@@ -132,3 +139,5 @@ if __name__ == '__main__':
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             torch.save(model, "val_{:.4f}.pt".format(val_loss))
+
+        scheduler.step(epoch)
