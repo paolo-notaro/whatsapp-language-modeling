@@ -13,13 +13,14 @@ from tensorboardX import SummaryWriter
 num_epochs = 1000
 init_lr = 1e-3
 gamma = 0.5
-decay_every = 10
+decay_every = 5
 bs = 5
-l2_reg = 0
+l2_reg = 5e-5
 log_every = 1
 val_ratio = 0.1
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-dataset_file_path = ''  # insert conversation dataset file here
+dataset_file_path = ''  # insert conv. dataset file here
+lexicon_size = 5000
 
 
 class CollatePad(object):
@@ -140,4 +141,4 @@ if __name__ == '__main__':
             best_val_loss = val_loss
             torch.save(model, "val_{:.4f}.pt".format(val_loss))
 
-        scheduler.step(epoch)
+        scheduler.step(None)
