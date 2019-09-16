@@ -62,6 +62,6 @@ def produce_conversations(file_path, word_emoji_tokenization=True):
 
 if __name__ == '__main__':
 
-    convs = produce_conversations('/home/paulstpr/Downloads/WhatsApp Chat with Sara Pontelli 💙.txt', True)
+    convs = produce_conversations('', True)
     print([len(conversation) for conversation in convs])
     print(convs[random.choice(len(convs))])
